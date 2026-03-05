@@ -20,6 +20,7 @@
 
   const els = {
     stepIndicator: document.getElementById("stepIndicator"),
+    stepTabs: document.getElementById("stepTabs"),
     statusMessage: document.getElementById("statusMessage"),
     startOverBtn: document.getElementById("startOverBtn"),
     savedProjectPanel: document.getElementById("savedProjectPanel"),
@@ -70,7 +71,8 @@
     clearSelectionBtn: document.getElementById("clearSelectionBtn"),
     downloadSelectedBtn: document.getElementById("downloadSelectedBtn"),
     downloadAllBtn: document.getElementById("downloadAllBtn"),
-    downloadBtn: document.getElementById("downloadBtn")
+    downloadBtn: document.getElementById("downloadBtn"),
+    previewBackBtn: document.getElementById("previewBackBtn")
   };
 
   function setStatus(message, isError = false) {
@@ -81,6 +83,7 @@
   function setSavedPanelVisible(isVisible) {
     els.savedProjectPanel.classList.toggle("hidden", !isVisible);
     els.stepIndicator.classList.toggle("hidden", isVisible);
+    els.stepTabs.classList.toggle("hidden", isVisible);
     els.step1.classList.toggle("hidden", isVisible || state.step !== 1);
     els.step2.classList.toggle("hidden", isVisible || state.step !== 2);
     els.step3.classList.toggle("hidden", isVisible || state.step !== 3);
@@ -326,6 +329,50 @@
     }
   }
 
+  function canGoToStep(targetStep) {
+    if (targetStep === 1 || targetStep === 2) {
+      return true;
+    }
+    if (targetStep === 3) {
+      return state.fieldNames.length > 0;
+    }
+    if (targetStep === 4) {
+      return state.activeRecords.length > 0 && state.payloads.length > 0;
+    }
+    return false;
+  }
+
+  function updateStepTabs() {
+    const tabButtons = els.stepTabs.querySelectorAll(".step-tab[data-step]");
+    for (const button of tabButtons) {
+      const step = Number.parseInt(button.getAttribute("data-step"), 10);
+      const canGo = canGoToStep(step);
+      button.disabled = !canGo;
+      button.classList.toggle("active", state.step === step);
+      button.classList.toggle("done", canGo && step < state.step);
+    }
+  }
+
+  function goToStep(step) {
+    if (step === state.step) {
+      return;
+    }
+
+    if (!canGoToStep(step)) {
+      if (step === 3) {
+        setStatus("Please finish Step 2 first.", true);
+      } else if (step === 4) {
+        setStatus("Create QR codes first, then open preview.", true);
+      } else {
+        setStatus("This step is not ready yet.", true);
+      }
+      return;
+    }
+
+    showStep(step);
+    setStatus("");
+  }
+
   function writeSavedProjects(projects) {
     if (!projects.length) {
       clearSavedProjectStorage();
@@ -397,6 +444,7 @@
       4: "QR Preview"
     };
     els.stepIndicator.textContent = labels[step] || "BilluQR";
+    updateStepTabs();
   }
 
   function makeSafeId(value, index) {
@@ -1099,6 +1147,20 @@
     }
   }
 
+  function onStepTabClick(event) {
+    const tab = event.target.closest(".step-tab[data-step]");
+    if (!tab) {
+      return;
+    }
+
+    const targetStep = Number.parseInt(tab.getAttribute("data-step"), 10);
+    if (!Number.isInteger(targetStep)) {
+      return;
+    }
+
+    goToStep(targetStep);
+  }
+
   async function renderPayloadToPngDataUrl(payload) {
     const canvas = document.createElement("canvas");
     await renderQrToCanvas(canvas, payload);
@@ -1190,19 +1252,17 @@
 
   function bindEvents() {
     els.step1NextBtn.addEventListener("click", onStep1Next);
+    els.stepTabs.addEventListener("click", onStepTabClick);
 
     els.step2BackBtn.addEventListener("click", () => {
-      showStep(1);
-      setStatus("");
+      goToStep(1);
     });
     els.step2ContinueBtn.addEventListener("click", onStep2Continue);
 
     els.manualMethodBtn.addEventListener("click", () => switchInputMethod("manual", true));
     els.excelMethodBtn.addEventListener("click", () => switchInputMethod("excel", true));
     els.step3BackBtn.addEventListener("click", () => {
-      renderFieldNameInputs(state.fieldCount, state.fieldNames);
-      showStep(2);
-      setStatus("");
+      goToStep(2);
     });
 
     els.saveTupleBtn.addEventListener("click", onSaveTuple);
@@ -1218,6 +1278,7 @@
     els.downloadSelectedBtn.addEventListener("click", onDownloadSelectedZip);
     els.downloadAllBtn.addEventListener("click", onDownloadAllZip);
     els.downloadBtn.addEventListener("click", onDownload);
+    els.previewBackBtn.addEventListener("click", () => goToStep(3));
     els.startOverBtn.addEventListener("click", onStartOver);
 
     els.continueSavedBtn.addEventListener("click", () => continueFromSavedProject(false));

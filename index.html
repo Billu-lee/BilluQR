@@ -47,6 +47,12 @@
       </section>
 
       <div class="step-indicator" id="stepIndicator">Step 1 of 3: Choose number of items</div>
+      <div class="step-tabs" id="stepTabs" aria-label="Step navigation">
+        <button class="step-tab active" type="button" data-step="1">1. Items</button>
+        <button class="step-tab" type="button" data-step="2">2. Names</button>
+        <button class="step-tab" type="button" data-step="3">3. Entries</button>
+        <button class="step-tab" type="button" data-step="4">4. Preview</button>
+      </div>
 
       <section class="step-panel" id="step1">
         <h2>Step 1: How many items in each entry?</h2>
@@ -140,6 +146,9 @@
           <button id="downloadSelectedBtn" class="btn secondary" type="button" disabled>Download Selected ZIP</button>
           <button id="downloadAllBtn" class="btn secondary" type="button" disabled>Download All ZIP</button>
           <button id="downloadBtn" class="btn primary" type="button">Download PNG</button>
+        </div>
+        <div class="btn-row top-gap">
+          <button id="previewBackBtn" class="btn ghost" type="button">Back to entry screen</button>
         </div>
       </section>
 
