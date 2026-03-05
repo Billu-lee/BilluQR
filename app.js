@@ -199,7 +199,30 @@
     return records;
   }
 
-  function normalizeProject(rawProject) {
+  function createProjectId() {
+    return `schema_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  function defaultSchemaName(fieldNames, index = 0) {
+    const fromFields = fieldNames.slice(0, 2).join(" + ");
+    return fromFields || `Schema ${index + 1}`;
+  }
+
+  function createUniqueSchemaName(fieldNames, existingProjects) {
+    const base = defaultSchemaName(fieldNames, existingProjects.length);
+    const used = new Set(existingProjects.map((project) => project.name.toLowerCase()));
+    if (!used.has(base.toLowerCase())) {
+      return base;
+    }
+
+    let suffix = 2;
+    while (used.has(`${base} (${suffix})`.toLowerCase())) {
+      suffix += 1;
+    }
+    return `${base} (${suffix})`;
+  }
+
+  function normalizeProject(rawProject, index = 0) {
     if (!rawProject || typeof rawProject !== "object") {
       return null;
     }
@@ -209,7 +232,18 @@
       return null;
     }
 
+    const id =
+      typeof rawProject.id === "string" && rawProject.id.trim()
+        ? rawProject.id.trim()
+        : createProjectId();
+    const name =
+      typeof rawProject.name === "string" && rawProject.name.trim()
+        ? rawProject.name.trim()
+        : defaultSchemaName(fieldNames, index);
+
     return {
+      id,
+      name,
       fieldNames,
       manualRecords: normalizeRecordArray(rawProject.manualRecords, fieldNames),
       excelRecords: normalizeRecordArray(rawProject.excelRecords, fieldNames),
@@ -230,41 +264,35 @@
     }
   }
 
-  function persistProject(project) {
-    const normalized = normalizeProject(project);
-    if (!normalized) {
-      clearSavedProjectStorage();
-      return;
+  function normalizeProjectList(rawValue) {
+    let candidates = [];
+    if (Array.isArray(rawValue)) {
+      candidates = rawValue;
+    } else if (rawValue && typeof rawValue === "object" && Array.isArray(rawValue.projects)) {
+      candidates = rawValue.projects;
+    } else if (rawValue && typeof rawValue === "object") {
+      candidates = [rawValue];
     }
 
-    try {
-      localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(normalized));
-      localStorage.setItem(SCHEMA_STORAGE_KEY, JSON.stringify({ fieldNames: normalized.fieldNames }));
-    } catch (error) {
-      // Non-blocking.
+    const projects = [];
+    for (let i = 0; i < candidates.length; i += 1) {
+      const normalized = normalizeProject(candidates[i], i);
+      if (normalized) {
+        projects.push(normalized);
+      }
     }
+
+    return projects;
   }
 
-  function persistProjectFromState() {
-    if (!state.fieldNames.length) {
-      return;
-    }
-
-    persistProject({
-      fieldNames: state.fieldNames,
-      manualRecords: state.manualRecords,
-      excelRecords: state.excelRecords,
-      inputMethod: state.inputMethod
-    });
-  }
-
-  function readSavedProject() {
+  function readSavedProjects() {
     try {
       const raw = localStorage.getItem(PROJECT_STORAGE_KEY);
       if (raw) {
-        const normalized = normalizeProject(JSON.parse(raw));
-        if (normalized) {
-          return normalized;
+        const parsed = JSON.parse(raw);
+        const normalizedList = normalizeProjectList(parsed);
+        if (normalizedList.length) {
+          return normalizedList;
         }
       }
     } catch (error) {
@@ -274,24 +302,90 @@
     try {
       const legacyRaw = localStorage.getItem(SCHEMA_STORAGE_KEY);
       if (!legacyRaw) {
-        return null;
+        return [];
       }
 
       const legacyParsed = JSON.parse(legacyRaw);
       const legacyFieldNames = validateFieldNameList(legacyParsed.fieldNames);
       if (!legacyFieldNames) {
-        return null;
+        return [];
       }
 
-      return {
-        fieldNames: legacyFieldNames,
-        manualRecords: [],
-        excelRecords: [],
-        inputMethod: "manual"
-      };
+      return [
+        {
+          id: createProjectId(),
+          name: defaultSchemaName(legacyFieldNames, 0),
+          fieldNames: legacyFieldNames,
+          manualRecords: [],
+          excelRecords: [],
+          inputMethod: "manual"
+        }
+      ];
     } catch (error) {
-      return null;
+      return [];
     }
+  }
+
+  function writeSavedProjects(projects) {
+    if (!projects.length) {
+      clearSavedProjectStorage();
+      return;
+    }
+
+    try {
+      localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(projects));
+      localStorage.setItem(SCHEMA_STORAGE_KEY, JSON.stringify({ fieldNames: projects[0].fieldNames }));
+    } catch (error) {
+      // Non-blocking.
+    }
+  }
+
+  function persistProject(project) {
+    const normalized = normalizeProject(project);
+    if (!normalized) {
+      clearSavedProjectStorage();
+      return [];
+    }
+
+    const projects = readSavedProjects();
+    const existingIndex = projects.findIndex((item) => item.id === normalized.id);
+    if (existingIndex >= 0) {
+      projects[existingIndex] = normalized;
+    } else {
+      projects.push(normalized);
+    }
+
+    writeSavedProjects(projects);
+    return projects;
+  }
+
+  function persistProjectFromState() {
+    if (!state.fieldNames.length) {
+      return [];
+    }
+
+    if (!state.currentProjectId) {
+      const existing = readSavedProjects();
+      state.currentProjectId = createProjectId();
+      state.currentProjectName = createUniqueSchemaName(state.fieldNames, existing);
+    }
+
+    const saved = persistProject({
+      id: state.currentProjectId,
+      name: state.currentProjectName || defaultSchemaName(state.fieldNames),
+      fieldNames: state.fieldNames,
+      manualRecords: state.manualRecords,
+      excelRecords: state.excelRecords,
+      inputMethod: state.inputMethod
+    });
+
+    state.savedProjects = saved;
+    return saved;
+  }
+
+  function readSavedProject() {
+    const projects = readSavedProjects();
+    return projects.length ? projects[0] : null;
   }
 
   function showStep(step) {
@@ -588,7 +682,39 @@
     const manualCount = project.manualRecords.length;
     const excelCount = project.excelRecords.length;
     const total = manualCount + excelCount;
-    return `Schema fields: ${project.fieldNames.length}. Saved tuples: ${total} (Manual ${manualCount}, Excel ${excelCount}).`;
+    return `Schema: ${project.name}. Fields: ${project.fieldNames.length}. Saved tuples: ${total} (Manual ${manualCount}, Excel ${excelCount}).`;
+  }
+
+  function renderSavedSchemaSelect() {
+    if (!state.savedProjects.length) {
+      els.savedSchemaSelect.innerHTML = '<option value="">No saved schemas</option>';
+      els.savedSchemaSelect.disabled = true;
+      return;
+    }
+
+    const options = state.savedProjects.map((project) => {
+      const tupleCount = project.manualRecords.length + project.excelRecords.length;
+      return `<option value="${project.id}">${project.name} (${project.fieldNames.length} fields, ${tupleCount} tuples)</option>`;
+    });
+
+    els.savedSchemaSelect.innerHTML = options.join("");
+    els.savedSchemaSelect.disabled = false;
+
+    if (state.savedProjectDraft) {
+      els.savedSchemaSelect.value = state.savedProjectDraft.id;
+    }
+  }
+
+  function selectSavedProjectById(projectId) {
+    const selected = state.savedProjects.find((project) => project.id === projectId);
+    if (!selected) {
+      return false;
+    }
+
+    state.savedProjectDraft = cloneProject(selected);
+    renderSavedSchemaSelect();
+    renderSavedProjectPanel();
+    return true;
   }
 
   function getSavedTupleEntries(project) {
@@ -654,6 +780,8 @@
       return false;
     }
 
+    state.currentProjectId = normalized.id;
+    state.currentProjectName = normalized.name;
     state.fieldNames = normalized.fieldNames;
     state.fieldCount = normalized.fieldNames.length;
     state.manualRecords = normalized.manualRecords;
@@ -693,7 +821,7 @@
       return;
     }
 
-    persistProject(project);
+    state.savedProjects = persistProject(project);
     state.savedProjectDraft = null;
     setSavedPanelVisible(false);
     showStep(3);
