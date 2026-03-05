@@ -18,48 +18,48 @@
           <h1>BilluQR</h1>
           <button id="startOverBtn" class="btn ghost" type="button">Start Over</button>
         </div>
-        <p>Create field-based records and generate downloadable QR codes.</p>
+        <p>Enter your details and create QR codes you can download.</p>
       </header>
 
       <section id="savedProjectPanel" class="saved-panel hidden">
-        <h2>Saved project found</h2>
+        <h2>Saved setups found</h2>
         <div class="input-row">
-          <label for="savedSchemaSelect">Saved schemas</label>
+          <label for="savedSchemaSelect">Saved setups</label>
           <select id="savedSchemaSelect"></select>
         </div>
         <p id="savedProjectSummary" class="help-text"></p>
         <div class="btn-row">
-          <button id="continueSavedBtn" class="btn primary" type="button">Continue selected schema + records</button>
-          <button id="continueClearTuplesBtn" class="btn secondary" type="button">Continue schema, clear tuples</button>
-          <button id="startFreshBtn" class="btn ghost" type="button">Start fresh (clear schema)</button>
+          <button id="continueSavedBtn" class="btn primary" type="button">Use this setup + saved entries</button>
+          <button id="continueClearTuplesBtn" class="btn secondary" type="button">Use this setup, clear old entries</button>
+          <button id="startFreshBtn" class="btn ghost" type="button">Start new setup</button>
         </div>
         <div class="input-row">
-          <label for="savedTupleSelect">Saved tuples (select one or many to remove)</label>
+          <label for="savedTupleSelect">Saved entries (choose one or more to delete)</label>
           <select id="savedTupleSelect" multiple size="8"></select>
         </div>
         <div class="meta-row">
-          <span id="savedSelectionCount">Selected tuples: 0</span>
+          <span id="savedSelectionCount">Selected entries: 0</span>
         </div>
         <div class="btn-row">
-          <button id="deleteSelectedSavedBtn" class="btn secondary" type="button" disabled>Delete selected tuples</button>
-          <button id="clearAllSavedTuplesBtn" class="btn ghost" type="button">Clear all tuples</button>
+          <button id="deleteSelectedSavedBtn" class="btn secondary" type="button" disabled>Delete selected entries</button>
+          <button id="clearAllSavedTuplesBtn" class="btn ghost" type="button">Delete all entries</button>
         </div>
       </section>
 
-      <div class="step-indicator" id="stepIndicator">Step 1 of 3: Choose number of fields</div>
+      <div class="step-indicator" id="stepIndicator">Step 1 of 3: Choose number of items</div>
 
       <section class="step-panel" id="step1">
-        <h2>Step 1: Choose number of fields</h2>
+        <h2>Step 1: How many items in each entry?</h2>
         <div class="input-row">
-          <label for="fieldCount">Number of fields</label>
+          <label for="fieldCount">Number of items</label>
           <input id="fieldCount" type="number" min="1" max="50" value="1" />
         </div>
         <button id="step1NextBtn" class="btn primary" type="button">Next</button>
       </section>
 
       <section class="step-panel hidden" id="step2">
-        <h2>Step 2: Enter field names</h2>
-        <p class="help-text">Provide unique, non-empty names (trimmed).</p>
+        <h2>Step 2: Name each item</h2>
+        <p class="help-text">Use simple names, like Name, Age, ID.</p>
         <form id="fieldNamesForm" class="stack"></form>
         <div class="btn-row">
           <button id="step2BackBtn" class="btn ghost" type="button">Back</button>
@@ -68,7 +68,7 @@
       </section>
 
       <section class="step-panel hidden" id="step3">
-        <h2>Step 3: Choose input method</h2>
+        <h2>Step 3: How do you want to add entries?</h2>
         <div class="method-switch">
           <button id="manualMethodBtn" class="btn method active" type="button">Manual entry</button>
           <button id="excelMethodBtn" class="btn method" type="button">Upload Excel</button>
@@ -78,16 +78,16 @@
           <h3>Manual entry</h3>
           <form id="manualForm" class="stack"></form>
           <div class="btn-row">
-            <button id="saveTupleBtn" class="btn secondary" type="button">Save tuple &amp; Add another</button>
+            <button id="saveTupleBtn" class="btn secondary" type="button">Save entry &amp; Add another</button>
             <button id="generateManualBtn" class="btn primary" type="button" disabled>Generate QR Codes</button>
           </div>
           <div class="meta-row">
-            <span id="manualCount">Saved tuples: 0</span>
+            <span id="manualCount">Saved entries: 0</span>
           </div>
           <div class="input-row">
-            <label for="manualRecordSelect">Saved records</label>
+            <label for="manualRecordSelect">Saved entries</label>
             <select id="manualRecordSelect" disabled>
-              <option value="">No records yet</option>
+              <option value="">No entries yet</option>
             </select>
           </div>
         </section>
@@ -104,7 +104,7 @@
               <button id="generateExcelBtn" class="btn primary" type="button" disabled>Generate QR Codes</button>
             </div>
             <div class="meta-row">
-              <span id="excelCount">Parsed tuples: 0</span>
+              <span id="excelCount">Loaded entries: 0</span>
             </div>
           </div>
         </section>
@@ -117,11 +117,11 @@
       <section class="step-panel hidden" id="previewSection">
         <h2>QR Preview</h2>
         <div class="input-row">
-          <label for="previewRecordSelect">Select record</label>
+          <label for="previewRecordSelect">Select entry</label>
           <select id="previewRecordSelect"></select>
         </div>
         <div class="input-row">
-          <label for="multiRecordSelect">Select multiple records (ZIP download)</label>
+          <label for="multiRecordSelect">Select multiple entries (ZIP download)</label>
           <select id="multiRecordSelect" multiple size="7"></select>
         </div>
         <div class="meta-row">
@@ -131,7 +131,7 @@
           <canvas id="qrCanvas" width="300" height="300" aria-label="QR code preview"></canvas>
         </div>
         <div class="input-row">
-          <label for="payloadView">Payload text</label>
+          <label for="payloadView">QR text preview</label>
           <textarea id="payloadView" rows="7" readonly></textarea>
         </div>
         <div class="btn-row">

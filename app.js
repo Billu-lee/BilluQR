@@ -205,7 +205,7 @@
 
   function defaultSchemaName(fieldNames, index = 0) {
     const fromFields = fieldNames.slice(0, 2).join(" + ");
-    return fromFields || `Schema ${index + 1}`;
+    return fromFields || `Setup ${index + 1}`;
   }
 
   function createUniqueSchemaName(fieldNames, existingProjects) {
@@ -383,11 +383,6 @@
     return saved;
   }
 
-  function readSavedProject() {
-    const projects = readSavedProjects();
-    return projects.length ? projects[0] : null;
-  }
-
   function showStep(step) {
     state.step = step;
     els.step1.classList.toggle("hidden", step !== 1);
@@ -396,9 +391,9 @@
     els.previewSection.classList.toggle("hidden", step !== 4);
 
     const labels = {
-      1: "Step 1 of 3: Choose number of fields",
-      2: "Step 2 of 3: Enter field names",
-      3: "Step 3 of 3: Choose input method",
+      1: "Step 1 of 3: Choose number of items",
+      2: "Step 2 of 3: Name each item",
+      3: "Step 3 of 3: Choose how to add entries",
       4: "QR Preview"
     };
     els.stepIndicator.textContent = labels[step] || "BilluQR";
@@ -438,11 +433,11 @@
     for (const input of inputs) {
       const name = input.value.trim();
       if (!name) {
-        return { ok: false, error: "Field names cannot be empty." };
+        return { ok: false, error: "Item names cannot be empty." };
       }
       const normalized = name.toLowerCase();
       if (seen.has(normalized)) {
-        return { ok: false, error: `Field names must be unique. Duplicate: ${name}` };
+        return { ok: false, error: `Item names must be different. Repeated: ${name}` };
       }
       seen.add(normalized);
       names.push(name);
@@ -496,7 +491,29 @@
   function getRecordLabel(record, index) {
     const firstField = state.fieldNames[0];
     const firstValue = record[firstField] || "";
-    return firstValue ? `Record ${index + 1} - ${firstValue}` : `Record ${index + 1}`;
+    return firstValue ? `Entry ${index + 1} - ${firstValue}` : `Entry ${index + 1}`;
+  }
+
+  function sanitizeFileToken(value) {
+    const cleaned = String(value ?? "")
+      .trim()
+      .replace(/[<>:"/\\|?*\x00-\x1F]/g, "")
+      .replace(/\s+/g, "_");
+    return cleaned.slice(0, 40);
+  }
+
+  function buildRecordFileBase(record, index) {
+    const firstField = state.fieldNames[0];
+    const secondField = state.fieldNames[1];
+    const firstValue = sanitizeFileToken(record?.[firstField] ?? "");
+    const secondValue = sanitizeFileToken(record?.[secondField] ?? "");
+
+    const parts = [firstValue, secondValue].filter(Boolean);
+    if (!parts.length) {
+      parts.push(`Entry-${index + 1}`);
+    }
+    parts.push(`No-${index + 1}`);
+    return `BilluQR_${parts.join("_")}`;
   }
 
   function buildPlainTextPayload(record) {
@@ -507,11 +524,11 @@
 
   function refreshManualRecordsUI() {
     const count = state.manualRecords.length;
-    els.manualCount.textContent = `Saved tuples: ${count}`;
+    els.manualCount.textContent = `Saved entries: ${count}`;
     els.generateManualBtn.disabled = count === 0;
 
     if (!count) {
-      els.manualRecordSelect.innerHTML = '<option value="">No records yet</option>';
+      els.manualRecordSelect.innerHTML = '<option value="">No entries yet</option>';
       els.manualRecordSelect.disabled = true;
       return;
     }
@@ -525,7 +542,7 @@
 
   function refreshExcelRecordsUI() {
     const count = state.excelRecords.length;
-    els.excelCount.textContent = `Parsed tuples: ${count}`;
+    els.excelCount.textContent = `Loaded entries: ${count}`;
     els.generateExcelBtn.disabled = count === 0;
   }
 
@@ -594,13 +611,13 @@
     try {
       await renderQrToCanvas(els.qrCanvas, payload);
     } catch (error) {
-      setStatus(`Failed to render QR code: ${error.message}`, true);
+      setStatus(`Could not show QR code: ${error.message}`, true);
     }
   }
 
   async function generateQRCodes(records) {
     if (!records.length) {
-      setStatus("No records available to generate QR codes.", true);
+      setStatus("No entries available to create QR codes.", true);
       return;
     }
 
@@ -616,7 +633,7 @@
     showStep(4);
     await renderSelectedRecord(0);
 
-    setStatus(`Generated ${records.length} QR code payload(s).`);
+    setStatus(`Created ${records.length} QR code(s).`);
   }
 
   function parseExcelFile(file) {
@@ -647,7 +664,7 @@
           const rawHeaders = rows[0].map((cell) => String(cell).trim());
           const missing = state.fieldNames.filter((required) => !rawHeaders.includes(required));
           if (missing.length) {
-            reject(new Error(`Missing columns: ${missing.join(", ")}`));
+            reject(new Error(`These columns are missing: ${missing.join(", ")}`));
             return;
           }
 
@@ -682,19 +699,19 @@
     const manualCount = project.manualRecords.length;
     const excelCount = project.excelRecords.length;
     const total = manualCount + excelCount;
-    return `Schema: ${project.name}. Fields: ${project.fieldNames.length}. Saved tuples: ${total} (Manual ${manualCount}, Excel ${excelCount}).`;
+    return `Setup: ${project.name}. Items: ${project.fieldNames.length}. Saved entries: ${total} (Manual ${manualCount}, Excel ${excelCount}).`;
   }
 
   function renderSavedSchemaSelect() {
     if (!state.savedProjects.length) {
-      els.savedSchemaSelect.innerHTML = '<option value="">No saved schemas</option>';
+      els.savedSchemaSelect.innerHTML = '<option value="">No saved setups</option>';
       els.savedSchemaSelect.disabled = true;
       return;
     }
 
     const options = state.savedProjects.map((project) => {
       const tupleCount = project.manualRecords.length + project.excelRecords.length;
-      return `<option value="${project.id}">${project.name} (${project.fieldNames.length} fields, ${tupleCount} tuples)</option>`;
+      return `<option value="${project.id}">${project.name} (${project.fieldNames.length} items, ${tupleCount} entries)</option>`;
     });
 
     els.savedSchemaSelect.innerHTML = options.join("");
@@ -739,7 +756,7 @@
       }
     }
 
-    els.savedSelectionCount.textContent = `Selected tuples: ${selectedCount}`;
+    els.savedSelectionCount.textContent = `Selected entries: ${selectedCount}`;
     els.deleteSelectedSavedBtn.disabled = selectedCount === 0;
   }
 
@@ -753,7 +770,7 @@
 
     const entries = getSavedTupleEntries(project);
     if (!entries.length) {
-      els.savedTupleSelect.innerHTML = '<option value="">No saved tuples</option>';
+      els.savedTupleSelect.innerHTML = '<option value="">No saved entries</option>';
       els.savedTupleSelect.disabled = true;
       refreshSavedSelectionActions();
       return;
@@ -817,7 +834,7 @@
     }
 
     if (!applyProjectToState(project)) {
-      setStatus("Saved project could not be loaded. Please start fresh.", true);
+      setStatus("This saved setup could not be loaded. Please start new.", true);
       return;
     }
 
@@ -827,10 +844,10 @@
     showStep(3);
 
     if (clearTuples) {
-      setStatus("Loaded previous schema. All tuples were cleared.");
+      setStatus("Saved setup loaded. Old entries were cleared.");
     } else {
       const total = state.manualRecords.length + state.excelRecords.length;
-      setStatus(`Loaded previous schema and ${total} saved tuple(s).`);
+      setStatus(`Saved setup loaded with ${total} entry(s).`);
     }
   }
 
@@ -874,9 +891,10 @@
       }
     }
 
-    persistProject(state.savedProjectDraft);
-    renderSavedProjectPanel();
-    setStatus("Selected saved tuples were deleted.");
+    const selectedId = state.savedProjectDraft.id;
+    state.savedProjects = persistProject(state.savedProjectDraft);
+    selectSavedProjectById(selectedId);
+    setStatus("Selected saved entries were deleted.");
   }
 
   function onClearAllSavedTuples() {
@@ -886,21 +904,25 @@
 
     state.savedProjectDraft.manualRecords = [];
     state.savedProjectDraft.excelRecords = [];
-    persistProject(state.savedProjectDraft);
-    renderSavedProjectPanel();
-    setStatus("All saved tuples were cleared. Schema is kept.");
+    const selectedId = state.savedProjectDraft.id;
+    state.savedProjects = persistProject(state.savedProjectDraft);
+    selectSavedProjectById(selectedId);
+    setStatus("All saved entries were deleted. Setup is still saved.");
   }
 
   function onStartFreshFromSavedPanel() {
-    const confirmed = window.confirm("Clear saved schema and all saved tuples?");
+    const confirmed = window.confirm("Clear saved setup and all saved entries?");
     if (!confirmed) {
       return;
     }
 
     clearSavedProjectStorage();
     state.savedProjectDraft = null;
+    state.savedProjects = [];
     state.fieldCount = 1;
     state.fieldNames = [];
+    state.currentProjectId = "";
+    state.currentProjectName = "";
     state.inputMethod = "manual";
     state.manualRecords = [];
     state.excelRecords = [];
@@ -920,7 +942,7 @@
 
     setSavedPanelVisible(false);
     showStep(1);
-    setStatus("Started fresh. Set your new schema.");
+    setStatus("Started new. Set up your items.");
   }
 
   function onStep1Next() {
@@ -943,7 +965,18 @@
       return;
     }
 
+    const previousFieldNames = state.fieldNames;
+    const isSameSchema =
+      state.currentProjectId &&
+      previousFieldNames.length === result.names.length &&
+      previousFieldNames.every((name, index) => name === result.names[index]);
+
     state.fieldNames = result.names;
+    if (!isSameSchema) {
+      const existingProjects = readSavedProjects();
+      state.currentProjectId = createProjectId();
+      state.currentProjectName = createUniqueSchemaName(result.names, existingProjects);
+    }
     state.manualRecords = [];
     state.excelRecords = [];
     state.activeRecords = [];
@@ -958,13 +991,13 @@
     switchInputMethod("manual", false);
     persistProjectFromState();
     showStep(3);
-    setStatus("Field names saved. Choose an input method.");
+    setStatus("Names saved. Now choose how to add entries.");
   }
 
   function onSaveTuple() {
     const record = readManualForm();
     if (!record) {
-      setStatus("Enter at least one value before saving a tuple.", true);
+      setStatus("Enter at least one value before saving.", true);
       return;
     }
 
@@ -972,7 +1005,7 @@
     refreshManualRecordsUI();
     persistProjectFromState();
     clearManualForm();
-    setStatus(`Tuple saved. Total saved: ${state.manualRecords.length}.`);
+    setStatus(`Entry saved. Total saved: ${state.manualRecords.length}.`);
   }
 
   async function onGenerateManual() {
@@ -989,7 +1022,7 @@
     try {
       const parsedRecords = await parseExcelFile(file);
       if (!parsedRecords.length) {
-        setStatus("No usable rows found after parsing (empty rows are skipped).", true);
+        setStatus("No usable rows found (empty rows were skipped).", true);
         state.excelRecords = [];
         refreshExcelRecordsUI();
         persistProjectFromState();
@@ -999,7 +1032,7 @@
       state.excelRecords = parsedRecords;
       refreshExcelRecordsUI();
       persistProjectFromState();
-      setStatus(`Excel parsed successfully. Records loaded: ${parsedRecords.length}.`);
+      setStatus(`Excel loaded successfully. Entries found: ${parsedRecords.length}.`);
     } catch (error) {
       setStatus(error.message, true);
     }
@@ -1020,15 +1053,16 @@
   function onDownload() {
     const index = Number.parseInt(els.previewRecordSelect.value, 10);
     if (!Number.isInteger(index)) {
-      setStatus("Select a record before downloading.", true);
+      setStatus("Select an entry before downloading.", true);
       return;
     }
 
+    const record = state.activeRecords[index];
     const link = document.createElement("a");
     link.href = toSolidWhitePngDataUrl(els.qrCanvas);
-    link.download = `BilluQR_Record-${index + 1}.png`;
+    link.download = `${buildRecordFileBase(record, index)}.png`;
     link.click();
-    setStatus(`Downloaded BilluQR_Record-${index + 1}.png`);
+    setStatus(`Downloaded ${buildRecordFileBase(record, index)}.png`);
   }
 
   function onSelectAll() {
@@ -1049,6 +1083,18 @@
     refreshMultiSelectActions();
   }
 
+  function onSavedSchemaChange() {
+    const selectedId = els.savedSchemaSelect.value;
+    if (!selectedId) {
+      return;
+    }
+
+    const changed = selectSavedProjectById(selectedId);
+    if (!changed) {
+      setStatus("Selected setup could not be loaded.", true);
+    }
+  }
+
   async function renderPayloadToPngDataUrl(payload) {
     const canvas = document.createElement("canvas");
     await renderQrToCanvas(canvas, payload);
@@ -1057,12 +1103,12 @@
 
   async function downloadRecordsAsZip(recordIndexes, zipFileName) {
     if (!recordIndexes.length) {
-      setStatus("Please select one or more records for ZIP download.", true);
+      setStatus("Please select one or more entries for ZIP download.", true);
       return;
     }
 
     if (typeof JSZip === "undefined") {
-      setStatus("ZIP download is unavailable because JSZip failed to load.", true);
+      setStatus("ZIP download is not available right now.", true);
       return;
     }
 
@@ -1078,10 +1124,11 @@
         if (!payload) {
           continue;
         }
+        const record = state.activeRecords[index];
 
         const dataUrl = await renderPayloadToPngDataUrl(payload);
         const base64 = dataUrl.split(",")[1];
-        zip.file(`BilluQR_Record-${index + 1}.png`, base64, { base64: true });
+        zip.file(`${buildRecordFileBase(record, index)}.png`, base64, { base64: true });
       }
 
       const zipBlob = await zip.generateAsync({ type: "blob" });
@@ -1096,7 +1143,7 @@
 
       setStatus(`Downloaded ${zipFileName}`);
     } catch (error) {
-      setStatus(`Failed to create ZIP: ${error.message}`, true);
+      setStatus(`Could not create ZIP file: ${error.message}`, true);
     } finally {
       refreshMultiSelectActions();
     }
@@ -1113,7 +1160,7 @@
   }
 
   function onStartOver() {
-    const confirmed = window.confirm("Start over and clear your saved schema and tuples?");
+    const confirmed = window.confirm("Start over and clear all saved setups and entries?");
     if (!confirmed) {
       return;
     }
@@ -1122,11 +1169,19 @@
     window.location.reload();
   }
 
-  function showSavedProjectPanel(project) {
-    state.savedProjectDraft = cloneProject(project);
+  function showSavedProjectPanel(projects) {
+    state.savedProjects = projects.map((project) => cloneProject(project));
+    const first = state.savedProjects[0];
+    if (!first) {
+      setSavedPanelVisible(false);
+      return;
+    }
+
+    state.savedProjectDraft = cloneProject(first);
+    renderSavedSchemaSelect();
     renderSavedProjectPanel();
     setSavedPanelVisible(true);
-    setStatus("Previous schema and tuples found. Continue or clean up saved data.");
+    setStatus("Saved setups found. Select one and continue.");
   }
 
   function bindEvents() {
@@ -1164,6 +1219,7 @@
     els.continueSavedBtn.addEventListener("click", () => continueFromSavedProject(false));
     els.continueClearTuplesBtn.addEventListener("click", () => continueFromSavedProject(true));
     els.startFreshBtn.addEventListener("click", onStartFreshFromSavedPanel);
+    els.savedSchemaSelect.addEventListener("change", onSavedSchemaChange);
     els.savedTupleSelect.addEventListener("change", refreshSavedSelectionActions);
     els.deleteSelectedSavedBtn.addEventListener("click", onDeleteSelectedSavedTuples);
     els.clearAllSavedTuplesBtn.addEventListener("click", onClearAllSavedTuples);
@@ -1178,14 +1234,14 @@
     refreshExcelRecordsUI();
     showStep(1);
 
-    const savedProject = readSavedProject();
-    if (savedProject) {
-      showSavedProjectPanel(savedProject);
+    const savedProjects = readSavedProjects();
+    if (savedProjects.length) {
+      showSavedProjectPanel(savedProjects);
       return;
     }
 
     setSavedPanelVisible(false);
-    setStatus("Set the number of fields to begin.");
+    setStatus("Choose how many items you want to start.");
   }
 
   init();
