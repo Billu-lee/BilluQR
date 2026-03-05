@@ -488,10 +488,18 @@
     }
   }
 
-  function getRecordLabel(record, index) {
-    const firstField = state.fieldNames[0];
-    const firstValue = record[firstField] || "";
-    return firstValue ? `Entry ${index + 1} - ${firstValue}` : `Entry ${index + 1}`;
+  function getRecordDisplayText(record, fieldNames = state.fieldNames) {
+    for (const field of fieldNames) {
+      const value = String(record?.[field] ?? "").trim();
+      if (value) {
+        return value;
+      }
+    }
+    return "(empty)";
+  }
+
+  function getRecordLabel(record) {
+    return getRecordDisplayText(record, state.fieldNames);
   }
 
   function sanitizeFileToken(value) {
@@ -502,7 +510,7 @@
     return cleaned.slice(0, 40);
   }
 
-  function buildRecordFileBase(record, index) {
+  function buildRecordFileBase(record, index, withPrefix = true) {
     const firstField = state.fieldNames[0];
     const secondField = state.fieldNames[1];
     const firstValue = sanitizeFileToken(record?.[firstField] ?? "");
@@ -513,7 +521,8 @@
       parts.push(`Entry-${index + 1}`);
     }
     parts.push(`No-${index + 1}`);
-    return `BilluQR_${parts.join("_")}`;
+    const base = parts.join("_");
+    return withPrefix ? `BilluQR_${base}` : base;
   }
 
   function buildPlainTextPayload(record) {
@@ -535,7 +544,7 @@
 
     els.manualRecordSelect.disabled = false;
     const options = state.manualRecords.map((record, index) => {
-      return `<option value="${index}">${getRecordLabel(record, index)}</option>`;
+      return `<option value="${index}">${getRecordLabel(record)}</option>`;
     });
     els.manualRecordSelect.innerHTML = options.join("");
   }
@@ -588,7 +597,7 @@
 
   function updatePreviewSelector() {
     const options = state.activeRecords.map((record, index) => {
-      return `<option value="${index}">${getRecordLabel(record, index)}</option>`;
+      return `<option value="${index}">${getRecordLabel(record)}</option>`;
     });
     const html = options.join("");
     els.previewRecordSelect.innerHTML = html;
@@ -777,14 +786,8 @@
     }
 
     els.savedTupleSelect.disabled = false;
-    const firstField = project.fieldNames[0];
     const options = entries.map((entry) => {
-      const sourceName = entry.source === "manual" ? "Manual" : "Excel";
-      const displayIndex = entry.index + 1;
-      const firstValue = entry.record[firstField] || "";
-      const label = firstValue
-        ? `${sourceName} ${displayIndex} - ${firstValue}`
-        : `${sourceName} ${displayIndex}`;
+      const label = getRecordDisplayText(entry.record, project.fieldNames);
       return `<option value="${entry.source}:${entry.index}">${label}</option>`;
     });
     els.savedTupleSelect.innerHTML = options.join("");
@@ -1058,11 +1061,12 @@
     }
 
     const record = state.activeRecords[index];
+    const singleFileName = buildRecordFileBase(record, index, false);
     const link = document.createElement("a");
     link.href = toSolidWhitePngDataUrl(els.qrCanvas);
-    link.download = `${buildRecordFileBase(record, index)}.png`;
+    link.download = `${singleFileName}.png`;
     link.click();
-    setStatus(`Downloaded ${buildRecordFileBase(record, index)}.png`);
+    setStatus(`Downloaded ${singleFileName}.png`);
   }
 
   function onSelectAll() {
@@ -1128,7 +1132,7 @@
 
         const dataUrl = await renderPayloadToPngDataUrl(payload);
         const base64 = dataUrl.split(",")[1];
-        zip.file(`${buildRecordFileBase(record, index)}.png`, base64, { base64: true });
+        zip.file(`${buildRecordFileBase(record, index, true)}.png`, base64, { base64: true });
       }
 
       const zipBlob = await zip.generateAsync({ type: "blob" });
