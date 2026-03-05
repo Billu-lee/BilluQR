@@ -1,0 +1,154 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BilluQR</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+</head>
+<body>
+  <main class="app-shell">
+    <div class="card">
+      <header class="app-header">
+        <div class="header-row">
+          <h1>BilluQR</h1>
+          <button id="startOverBtn" class="btn ghost" type="button">Start Over</button>
+        </div>
+        <p>Create field-based records and generate downloadable QR codes.</p>
+      </header>
+
+      <section id="savedProjectPanel" class="saved-panel hidden">
+        <h2>Saved project found</h2>
+        <div class="input-row">
+          <label for="savedSchemaSelect">Saved schemas</label>
+          <select id="savedSchemaSelect"></select>
+        </div>
+        <p id="savedProjectSummary" class="help-text"></p>
+        <div class="btn-row">
+          <button id="continueSavedBtn" class="btn primary" type="button">Continue selected schema + records</button>
+          <button id="continueClearTuplesBtn" class="btn secondary" type="button">Continue schema, clear tuples</button>
+          <button id="startFreshBtn" class="btn ghost" type="button">Start fresh (clear schema)</button>
+        </div>
+        <div class="input-row">
+          <label for="savedTupleSelect">Saved tuples (select one or many to remove)</label>
+          <select id="savedTupleSelect" multiple size="8"></select>
+        </div>
+        <div class="meta-row">
+          <span id="savedSelectionCount">Selected tuples: 0</span>
+        </div>
+        <div class="btn-row">
+          <button id="deleteSelectedSavedBtn" class="btn secondary" type="button" disabled>Delete selected tuples</button>
+          <button id="clearAllSavedTuplesBtn" class="btn ghost" type="button">Clear all tuples</button>
+        </div>
+      </section>
+
+      <div class="step-indicator" id="stepIndicator">Step 1 of 3: Choose number of fields</div>
+
+      <section class="step-panel" id="step1">
+        <h2>Step 1: Choose number of fields</h2>
+        <div class="input-row">
+          <label for="fieldCount">Number of fields</label>
+          <input id="fieldCount" type="number" min="1" max="50" value="1" />
+        </div>
+        <button id="step1NextBtn" class="btn primary" type="button">Next</button>
+      </section>
+
+      <section class="step-panel hidden" id="step2">
+        <h2>Step 2: Enter field names</h2>
+        <p class="help-text">Provide unique, non-empty names (trimmed).</p>
+        <form id="fieldNamesForm" class="stack"></form>
+        <div class="btn-row">
+          <button id="step2BackBtn" class="btn ghost" type="button">Back</button>
+          <button id="step2ContinueBtn" class="btn primary" type="button">Continue</button>
+        </div>
+      </section>
+
+      <section class="step-panel hidden" id="step3">
+        <h2>Step 3: Choose input method</h2>
+        <div class="method-switch">
+          <button id="manualMethodBtn" class="btn method active" type="button">Manual entry</button>
+          <button id="excelMethodBtn" class="btn method" type="button">Upload Excel</button>
+        </div>
+
+        <section id="manualSection" class="method-section">
+          <h3>Manual entry</h3>
+          <form id="manualForm" class="stack"></form>
+          <div class="btn-row">
+            <button id="saveTupleBtn" class="btn secondary" type="button">Save tuple &amp; Add another</button>
+            <button id="generateManualBtn" class="btn primary" type="button" disabled>Generate QR Codes</button>
+          </div>
+          <div class="meta-row">
+            <span id="manualCount">Saved tuples: 0</span>
+          </div>
+          <div class="input-row">
+            <label for="manualRecordSelect">Saved records</label>
+            <select id="manualRecordSelect" disabled>
+              <option value="">No records yet</option>
+            </select>
+          </div>
+        </section>
+
+        <section id="excelSection" class="method-section hidden">
+          <h3>Upload Excel</h3>
+          <div class="stack">
+            <div class="input-row">
+              <label for="excelFileInput">Excel file (.xlsx / .xls)</label>
+              <input id="excelFileInput" type="file" accept=".xlsx,.xls" />
+            </div>
+            <div class="btn-row">
+              <button id="parseExcelBtn" class="btn secondary" type="button">Parse Excel</button>
+              <button id="generateExcelBtn" class="btn primary" type="button" disabled>Generate QR Codes</button>
+            </div>
+            <div class="meta-row">
+              <span id="excelCount">Parsed tuples: 0</span>
+            </div>
+          </div>
+        </section>
+
+        <div class="btn-row top-gap">
+          <button id="step3BackBtn" class="btn ghost" type="button">Back</button>
+        </div>
+      </section>
+
+      <section class="step-panel hidden" id="previewSection">
+        <h2>QR Preview</h2>
+        <div class="input-row">
+          <label for="previewRecordSelect">Select record</label>
+          <select id="previewRecordSelect"></select>
+        </div>
+        <div class="input-row">
+          <label for="multiRecordSelect">Select multiple records (ZIP download)</label>
+          <select id="multiRecordSelect" multiple size="7"></select>
+        </div>
+        <div class="meta-row">
+          <span id="multiSelectCount">Selected for ZIP: 0</span>
+        </div>
+        <div class="canvas-wrap">
+          <canvas id="qrCanvas" width="300" height="300" aria-label="QR code preview"></canvas>
+        </div>
+        <div class="input-row">
+          <label for="payloadView">Payload text</label>
+          <textarea id="payloadView" rows="7" readonly></textarea>
+        </div>
+        <div class="btn-row">
+          <button id="selectAllBtn" class="btn ghost" type="button">Select All</button>
+          <button id="clearSelectionBtn" class="btn ghost" type="button">Clear Selection</button>
+          <button id="downloadSelectedBtn" class="btn secondary" type="button" disabled>Download Selected ZIP</button>
+          <button id="downloadAllBtn" class="btn secondary" type="button" disabled>Download All ZIP</button>
+          <button id="downloadBtn" class="btn primary" type="button">Download PNG</button>
+        </div>
+      </section>
+
+      <p id="statusMessage" class="status" role="status" aria-live="polite"></p>
+    </div>
+  </main>
+
+  <footer class="site-footer">BilluQR — Sponsored by Lupe Stationery</footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
